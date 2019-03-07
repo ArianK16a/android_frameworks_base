@@ -116,6 +116,7 @@ import com.android.systemui.plugins.VolumeDialog;
 import com.android.systemui.plugins.VolumeDialogController;
 import com.android.systemui.plugins.VolumeDialogController.State;
 import com.android.systemui.plugins.VolumeDialogController.StreamState;
+import com.android.systemui.statusbar.phone.ExpandableIndicator;
 import com.android.systemui.statusbar.policy.AccessibilityManagerWrapper;
 import com.android.systemui.statusbar.policy.ConfigurationController;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
@@ -229,8 +230,8 @@ public class VolumeDialogImpl implements VolumeDialog,
     private ImageButton mRingerIcon;
     private ViewGroup mODICaptionsView;
     private CaptionsToggleImageButton mODICaptionsIcon;
-    private View mSettingsView;
-    private ImageButton mSettingsIcon;
+    private View mExpandRowsView;
+    private ExpandableIndicator mExpandRows;
     private FrameLayout mZenIcon;
     private final List<VolumeRow> mRows = new ArrayList<>();
     private ConfigurableTexts mConfigurableTexts;
@@ -265,6 +266,8 @@ public class VolumeDialogImpl implements VolumeDialog,
     private final boolean mUseBackgroundBlur;
     private Consumer<Boolean> mCrossWindowBlurEnabledListener;
     private BackgroundBlurDrawable mDialogRowsViewBackground;
+
+    private boolean mExpanded;
 
     public VolumeDialogImpl(Context context) {
         mContext =
@@ -389,6 +392,7 @@ public class VolumeDialogImpl implements VolumeDialog,
         mConfigurableTexts = new ConfigurableTexts(mContext);
         mHovering = false;
         mShowing = false;
+        mExpanded = false;
         mWindow = mDialog.getWindow();
         mWindow.requestFeature(Window.FEATURE_NO_TITLE);
         mWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
@@ -417,6 +421,8 @@ public class VolumeDialogImpl implements VolumeDialog,
         mDialog.setContentView(R.layout.volume_dialog);
         mDialogView = mDialog.findViewById(R.id.volume_dialog);
         mDialogView.setAlpha(0);
+        mDialogView.setLayoutDirection(mVolumePanelOnLeft ?
+                View.LAYOUT_DIRECTION_LTR : View.LAYOUT_DIRECTION_RTL);
         mDialog.setCanceledOnTouchOutside(true);
         mDialog.setOnShowListener(dialog -> {
             mDialogView.getViewTreeObserver().addOnComputeInternalInsetsListener(this);
@@ -550,8 +556,8 @@ public class VolumeDialogImpl implements VolumeDialog,
             mODICaptionsTooltipViewStub = null;
         }
 
-        mSettingsView = mDialog.findViewById(R.id.settings_container);
-        mSettingsIcon = mDialog.findViewById(R.id.settings);
+        mExpandRowsView = mDialog.findViewById(R.id.expandable_indicator_container);
+        mExpandRows = mDialog.findViewById(R.id.expandable_indicator);
 
         if (mRows.isEmpty()) {
             if (!AudioSystem.isSingleVolume(mContext)) {
@@ -569,7 +575,7 @@ public class VolumeDialogImpl implements VolumeDialog,
                             R.drawable.ic_volume_notification_mute, true, false);
                 }
                 addRow(STREAM_ALARM,
-                        R.drawable.ic_alarm, R.drawable.ic_volume_alarm_mute, true, false);
+                        R.drawable.ic_volume_alarm, R.drawable.ic_volume_alarm_mute, true, false);
                 addRow(AudioManager.STREAM_VOICE_CALL,
                         com.android.internal.R.drawable.ic_phone,
                         com.android.internal.R.drawable.ic_phone, false, false);
@@ -1045,21 +1051,26 @@ public class VolumeDialogImpl implements VolumeDialog,
         mIsRingerDrawerOpen = false;
     }
 
+    private void updateExpandedRows(boolean expand) {
+        if (!expand) mController.setActiveStream(AudioManager.STREAM_MUSIC);
+
+        Util.setVisOrGone(findRow(AudioManager.STREAM_RING).view, expand);
+        Util.setVisOrGone(findRow(STREAM_ALARM).view, expand);
+    }
+
     public void initSettingsH() {
-        if (mSettingsView != null) {
-            mSettingsView.setVisibility(
+        if (mExpandRowsView != null) {
+            mExpandRowsView.setVisibility(
                     mDeviceProvisionedController.isCurrentUserSetup() &&
                             mActivityManager.getLockTaskModeState() == LOCK_TASK_MODE_NONE ?
                             VISIBLE : GONE);
         }
-        if (mSettingsIcon != null) {
-            mSettingsIcon.setOnClickListener(v -> {
-                Events.writeEvent(Events.EVENT_SETTINGS_CLICK);
-                Intent intent = new Intent(Settings.Panel.ACTION_VOLUME);
-                dismissH(DISMISS_REASON_SETTINGS_CLICKED);
-                Dependency.get(MediaOutputDialogFactory.class).dismiss();
-                Dependency.get(ActivityStarter.class).startActivity(intent,
-                        true /* dismissShade */);
+        if (mExpandRows != null) {
+            mExpandRows.setOnClickListener(v -> {
+                updateExpandedRows(!mExpanded);
+
+                mExpandRows.setExpanded(!mExpanded);
+                mExpanded = !mExpanded;
             });
         }
     }
@@ -1342,6 +1353,10 @@ public class VolumeDialogImpl implements VolumeDialog,
             Log.d(TAG, "mDialog.dismiss() reason: " + Events.DISMISS_REASONS[reason]
                     + " from: " + Debug.getCaller());
         }
+        if (!mShowing) {
+            // This may happen when dismissing an expanded panel, don't animate again
+            return;
+        }
         mHandler.removeMessages(H.DISMISS);
         mHandler.removeMessages(H.SHOW);
         if (mIsAnimatingDismiss) {
@@ -1363,6 +1378,8 @@ public class VolumeDialogImpl implements VolumeDialog,
                 .withEndAction(() -> mHandler.postDelayed(() -> {
                     mDialog.dismiss();
                     tryToRemoveCaptionsTooltip();
+                    mExpanded = false;
+                    mExpandRows.setExpanded(mExpanded);
                     mController.notifyVisible(false);
                     mIsAnimatingDismiss = false;
 
@@ -1429,7 +1446,7 @@ public class VolumeDialogImpl implements VolumeDialog,
         for (final VolumeRow row : mRows) {
             final boolean isActive = row == activeRow;
             final boolean shouldBeVisible = shouldBeVisibleH(row, activeRow);
-            Util.setVisOrGone(row.view, shouldBeVisible);
+            if (!mExpanded) Util.setVisOrGone(row.view, shouldBeVisible);
 
             if (shouldBeVisible && mRingerAndDrawerContainerBackground != null) {
                 // For RTL, the rightmost row has the lowest index since child views are laid out
