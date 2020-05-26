@@ -1399,6 +1399,11 @@ public class VolumeDialogImpl implements VolumeDialog,
                 || mContext.getPackageManager().hasSystemFeature(PackageManager.FEATURE_TELEVISION);
     }
 
+    private boolean isNotificationVolumeLinked() {
+        ContentResolver cr = mContext.getContentResolver();
+        return Settings.Secure.getInt(cr, Settings.Secure.VOLUME_LINK_NOTIFICATION, 1) == 1;
+    }
+
     private boolean shouldBeVisibleH(VolumeRow row, VolumeRow activeRow) {
         boolean isActive = row.stream == activeRow.stream;
 
@@ -1421,7 +1426,9 @@ public class VolumeDialogImpl implements VolumeDialog,
             // All streams that should be shown in the expanded dialog
             if (mExpanded && (row.stream == STREAM_RING
                     || row.stream == STREAM_ALARM
-                    || row.stream == STREAM_MUSIC)) {
+                    || row.stream == STREAM_MUSIC
+                    || (!isNotificationVolumeLinked()
+                    && row.stream == STREAM_NOTIFICATION))) {
                 return true;
             }
 
