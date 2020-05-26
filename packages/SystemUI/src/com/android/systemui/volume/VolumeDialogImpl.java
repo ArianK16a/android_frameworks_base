@@ -1088,11 +1088,20 @@ public class VolumeDialogImpl implements VolumeDialog,
         }
     }
 
+    private boolean isNotificationVolumeLinked() {
+        ContentResolver cr = mContext.getContentResolver();
+        return Settings.Secure.getInt(cr, Settings.Secure.VOLUME_LINK_NOTIFICATION, 1) == 1;
+    }
+
     private void updateExpandedRows(boolean expand) {
         if (!expand) mController.setActiveStream(AudioManager.STREAM_MUSIC);
 
         Util.setVisOrGone(findRow(AudioManager.STREAM_RING).view, expand);
         Util.setVisOrGone(findRow(STREAM_ALARM).view, expand);
+        if (!isNotificationVolumeLinked()) {
+            Util.setVisOrGone(
+                    findRow(AudioManager.STREAM_NOTIFICATION).view, expand);
+        }
     }
 
     public void initSettingsH() {
