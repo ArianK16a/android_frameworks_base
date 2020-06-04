@@ -1060,6 +1060,41 @@ public class VolumeDialogImpl implements VolumeDialog,
         mIsRingerDrawerOpen = false;
     }
 
+    private void animateExpandedRowsChange(boolean expand) {
+        final int startWidth = mDialogRowsView.getLayoutParams().width;
+        final int targetWidth;
+
+        if (expand) {
+            updateRowsH(mDefaultRow);
+            mDialogRowsView.measure(WRAP_CONTENT, WRAP_CONTENT);
+            targetWidth = mDialogRowsView.getMeasuredWidth();
+        } else {
+            targetWidth = mContext.getResources().getDimensionPixelSize(
+                    R.dimen.volume_dialog_panel_width);
+        }
+
+        ValueAnimator animator = ValueAnimator.ofInt(startWidth, targetWidth);
+        animator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+            @Override
+            public void onAnimationUpdate(ValueAnimator valueAnimator) {
+                mDialogRowsView.getLayoutParams().width =
+                        (Integer) valueAnimator.getAnimatedValue();
+                mDialogRowsView.requestLayout();
+            }
+        });
+        animator.addListener(new AnimatorListenerAdapter() {
+            @Override
+            public void onAnimationEnd(Animator animation) {
+                if (!expand) {
+                    updateRowsH(mDefaultRow);
+                }
+            }
+        });
+        animator.setInterpolator(new SystemUIInterpolators.LogDecelerateInterpolator());
+        animator.setDuration(DRAWER_ANIMATION_DURATION);
+        animator.start();
+    }
+
     public void initSettingsH() {
         if (mExpandRowsView != null) {
             mExpandRowsView.setVisibility(
@@ -1070,7 +1105,7 @@ public class VolumeDialogImpl implements VolumeDialog,
         if (mExpandRows != null) {
             mExpandRows.setOnClickListener(v -> {
                 mExpanded = !mExpanded;
-                updateRowsH(mDefaultRow);
+                animateExpandedRowsChange(mExpanded);
                 mExpandRows.setExpanded(mExpanded);
             });
         }
@@ -1377,6 +1412,8 @@ public class VolumeDialogImpl implements VolumeDialog,
                     mDialog.dismiss();
                     tryToRemoveCaptionsTooltip();
                     mExpanded = false;
+                    mDialogRowsView.getLayoutParams().width = mContext.getResources()
+                            .getDimensionPixelSize(R.dimen.volume_dialog_panel_width);
                     mExpandRows.setExpanded(mExpanded);
                     mIsAnimatingDismiss = false;
 
