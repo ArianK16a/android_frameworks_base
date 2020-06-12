@@ -1075,7 +1075,7 @@ public class VolumeDialogImpl implements VolumeDialog,
             mMediaOutputView.setVisibility(
                     mDeviceProvisionedController.isCurrentUserSetup() &&
                             mActivityManager.getLockTaskModeState() == LOCK_TASK_MODE_NONE &&
-                            isBluetoothA2dpConnected() ? VISIBLE : GONE);
+                            isBluetoothA2dpConnected() && mExpanded ? VISIBLE : GONE);
         }
         if (mMediaOutputIcon != null) {
             mMediaOutputIcon.setOnClickListener(v -> {
@@ -1110,6 +1110,8 @@ public class VolumeDialogImpl implements VolumeDialog,
 
                 mExpandRows.setExpanded(!mExpanded);
                 mExpanded = !mExpanded;
+
+                updateMediaOutputView();
             });
         }
     }
