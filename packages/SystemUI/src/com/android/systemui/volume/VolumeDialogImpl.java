@@ -45,6 +45,8 @@ import android.annotation.SuppressLint;
 import android.app.ActivityManager;
 import android.app.Dialog;
 import android.app.KeyguardManager;
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothProfile;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -231,6 +233,8 @@ public class VolumeDialogImpl implements VolumeDialog,
     private ImageButton mRingerIcon;
     private ViewGroup mODICaptionsView;
     private CaptionsToggleImageButton mODICaptionsIcon;
+    private View mMediaOutputView;
+    private ImageButton mMediaOutputIcon;
     private View mExpandRowsView;
     private ExpandableIndicator mExpandRows;
     private FrameLayout mZenIcon;
@@ -560,6 +564,9 @@ public class VolumeDialogImpl implements VolumeDialog,
             mDialogView.removeView(mODICaptionsTooltipViewStub);
             mODICaptionsTooltipViewStub = null;
         }
+
+        mMediaOutputView = mDialog.findViewById(R.id.media_output_container);
+        mMediaOutputIcon = mDialog.findViewById(R.id.media_output);
 
         mExpandRowsView = mDialog.findViewById(R.id.expandable_indicator_container);
         mExpandRows = mDialog.findViewById(R.id.expandable_indicator);
@@ -1056,6 +1063,31 @@ public class VolumeDialogImpl implements VolumeDialog,
         mIsRingerDrawerOpen = false;
     }
 
+    private static boolean isBluetoothA2dpConnected() {
+        BluetoothAdapter mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        return mBluetoothAdapter != null && mBluetoothAdapter.isEnabled()
+                && mBluetoothAdapter.getProfileConnectionState(BluetoothProfile.A2DP)
+                == BluetoothProfile.STATE_CONNECTED;
+    }
+
+    private void updateMediaOutputView() {
+        if (mMediaOutputView != null) {
+            mMediaOutputView.setVisibility(
+                    mDeviceProvisionedController.isCurrentUserSetup() &&
+                            mActivityManager.getLockTaskModeState() == LOCK_TASK_MODE_NONE &&
+                            isBluetoothA2dpConnected() ? VISIBLE : GONE);
+        }
+        if (mMediaOutputIcon != null) {
+            mMediaOutputIcon.setOnClickListener(v -> {
+                Events.writeEvent(Events.EVENT_SETTINGS_CLICK);
+                Intent intent = new Intent(Settings.Panel.ACTION_VOLUME);
+                dismissH(DISMISS_REASON_SETTINGS_CLICKED);
+                Dependency.get(ActivityStarter.class).startActivity(intent,
+                        true /* dismissShade */);
+            });
+        }
+    }
+
     private void updateExpandedRows(boolean expand) {
         if (!expand) mController.setActiveStream(AudioManager.STREAM_MUSIC);
 
@@ -1064,6 +1096,8 @@ public class VolumeDialogImpl implements VolumeDialog,
     }
 
     public void initSettingsH() {
+        updateMediaOutputView();
+
         if (mExpandRowsView != null) {
             mExpandRowsView.setVisibility(
                     mDeviceProvisionedController.isCurrentUserSetup() &&
