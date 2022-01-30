@@ -87,7 +87,8 @@
                 android:layout_gravity="right"
                 android:orientation="vertical"
                 android:clipChildren="false"
-                android:clipToPadding="false" >
+                android:clipToPadding="false"
+                android:background="@drawable/rounded_bg_full" >
                 <LinearLayout
                     android:id="@+id/volume_dialog_rows"
                     android:layout_width="wrap_content"
@@ -102,8 +103,7 @@
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
                     android:gravity="right"
-                    android:layout_gravity="right"
-                    android:background="@drawable/volume_background_bottom" >
+                    android:layout_gravity="right" >
                     <FrameLayout
                         android:id="@+id/media_output_container"
                         android:layout_width="wrap_content"
